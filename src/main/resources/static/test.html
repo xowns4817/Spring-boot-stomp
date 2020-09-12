@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="/webjars/jquery/jquery.min.js"></script>
+    <script src="/webjars/sockjs-client/sockjs.min.js"></script>
+    <script src="/webjars/stomp-websocket/stomp.min.js"></script>
+</head>
+<body>
+
+방 아이디 : <input type="text" id ="room">
+<button onclick="connect()"> 채팅 방 입장</button>
+<button onclick="disconnect()">채팅 방 퇴장 </button><br>
+
+아이디 : <input type="text" id="user_id"><br>
+채팅 내용 : <input type="text" id="chat_msg">
+<button onclick="sendName()">채팅 전송하기</button>
+</body>
+
+<script>
+
+    function connect() {
+        var socket = new SockJS('http://localhost:8080/ws');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function (frame) {
+            //console.log('Connected: ' + frame);
+            //입장 구독
+            var roomId = $("#room").val();
+            var userId = $("#user_id").val();
+
+            stompClient.subscribe('/topic/in/'+roomId, function (greeting) {
+                console.log(greeting.body)
+                //$("#greetings").append("<tr><td>" + JSON.parse(greeting.body).content + "</td></tr>");
+            });
+
+            // 퇴장 구독
+            stompClient.subscribe('/topic/out/'+roomId, function (greeting) {
+                console.log(greeting.body)
+                //$("#greetings").append("<tr><td>" + JSON.parse(greeting.body).content + "</td></tr>");
+            });
+
+            // 채팅 구독
+            stompClient.subscribe('/topic/chat/'+roomId, function (greeting) {
+                console.log(greeting.body)
+                //$("#greetings").append("<tr><td>" + JSON.parse(greeting.body).content + "</td></tr>");
+            });
+
+            // 임장 메시지 broadCast
+            stompClient.send("/app/in/"+roomId+"/"+userId, {}, JSON.stringify({'roomId': roomId, "userId" : userId}));
+        });
+    }
+    function disconnect() {
+        // 퇴장 메시지 broadCast
+        var roomId = $("#room").val();
+        var userId = $("#user_id").val();
+
+        if (stompClient !== null) {
+            stompClient.send("/app/out/"+roomId+"/"+userId, {}, JSON.stringify({'roomId': roomId, "userId" : userId}));
+            stompClient.disconnect();
+        }
+        console.log("Disconnected");
+    }
+
+    function sendName() {
+        var roomId = $("#room").val();
+        var userId = $("#user_id").val();
+        var chatMsg = $("#chat_msg").val();
+
+        stompClient.send("/app/chat/"+roomId, {}, JSON.stringify({
+                    'userId': userId,
+                    'msg': chatMsg}));
+    }
+</script>
+</html>
